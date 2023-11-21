@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"encoding/json"
@@ -13,18 +13,22 @@ import (
 	"github.com/like2foxes/chripy/internal/database"
 )
 
-type apiConfig struct {
+type ApiConfig struct {
 	fileserverHits int
 }
 
-func (c *apiConfig) MiddlewareMetricsInc(next http.Handler) http.Handler {
+func (c *ApiConfig) MiddlewareMetricsInc(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c.fileserverHits++
 		next.ServeHTTP(w, r)
 	})
 }
 
-func (c *apiConfig) getMetrics(w http.ResponseWriter, r *http.Request) {
+func NewApiConfig() *ApiConfig {
+	return &ApiConfig{fileserverHits: 0}
+}
+
+func (c *ApiConfig) GetMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(
@@ -36,20 +40,23 @@ func (c *apiConfig) getMetrics(w http.ResponseWriter, r *http.Request) {
 			"</body></html>"))
 }
 
-func (c *apiConfig) getReset(w http.ResponseWriter, r *http.Request) {
+func (c *ApiConfig) GetReset(w http.ResponseWriter, r *http.Request) {
 	c.fileserverHits = 0
 	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Hits: " + fmt.Sprintf("%d", c.fileserverHits)))
 }
 
-func getHealthz(w http.ResponseWriter, r *http.Request) {
+func PostLogin(w http.ResponseWriter, r *http.Request) {
+}
+
+func GetHealthz(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(http.StatusText(http.StatusOK)))
 }
 
-func getChirps(w http.ResponseWriter, r *http.Request) {
+func GetChirps(w http.ResponseWriter, r *http.Request) {
 	db, err := database.NewDB("database.json")
 	if err != nil {
 		log.Println("Error creating db")
@@ -65,7 +72,7 @@ func getChirps(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, chirps)
 }
 
-func getChirp(w http.ResponseWriter, r *http.Request) {
+func GetChirp(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	db, err := database.NewDB("database.json")
 	if err != nil {
@@ -92,7 +99,7 @@ func getChirp(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, chirp)
 }
 
-func postChirp(w http.ResponseWriter, r *http.Request) {
+func PostChirp(w http.ResponseWriter, r *http.Request) {
 
 	decoder := json.NewDecoder(r.Body)
 	var c chirp
@@ -127,7 +134,7 @@ func postChirp(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusCreated, chirp)
 }
 
-func postUser(w http.ResponseWriter, r *http.Request) {
+func PostUser(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var u user
 	err := decoder.Decode(&u)
@@ -153,7 +160,7 @@ func postUser(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusCreated, noPWUser)
 }
 
-func getUsers(w http.ResponseWriter, r *http.Request) {
+func GetUsers(w http.ResponseWriter, r *http.Request) {
 	db, err := database.NewDB("database.json")
 	if err != nil {
 		log.Println("Error creating db")
@@ -169,7 +176,7 @@ func getUsers(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, users)
 }
 
-func getUser(w http.ResponseWriter, r *http.Request) {
+func GetUser(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	db, err := database.NewDB("database.json")
 	if err != nil {

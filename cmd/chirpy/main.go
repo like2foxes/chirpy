@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/like2foxes/chripy/internal/api"
 )
 
 func main() {
@@ -23,7 +24,7 @@ func main() {
 		}
 	}
 
-	apiCfg := &apiConfig{fileserverHits: 0}
+	apiCfg := api.NewApiConfig()
 	fsHandler := apiCfg.MiddlewareMetricsInc(
 		http.StripPrefix(
 			"/app",
@@ -38,19 +39,19 @@ func main() {
 	r.Handle("/app", fsHandler)
 
 	r.Mount("/api", apiRouter)
-	apiRouter.Get("/healthz", getHealthz)
-	apiRouter.Get("/reset", apiCfg.getReset)
-	apiRouter.Get("/chirps", getChirps)
-	apiRouter.Get("/chirps/{id}", getChirp)
-	apiRouter.Post("/chirps", postChirp)
-	apiRouter.Get("/users", getUsers)
-	apiRouter.Get("/users/{id}", getUser)
-	apiRouter.Post("/users", postUser)
+	apiRouter.Get("/healthz", api.GetHealthz)
+	apiRouter.Get("/reset", apiCfg.GetReset)
+	apiRouter.Get("/chirps", api.GetChirps)
+	apiRouter.Get("/chirps/{id}", api.GetChirp)
+	apiRouter.Post("/chirps", api.PostChirp)
+	apiRouter.Get("/users", api.GetUsers)
+	apiRouter.Get("/users/{id}", api.GetUser)
+	apiRouter.Post("/users", api.PostUser)
 
 	r.Mount("/admin", adminRouter)
-	adminRouter.Get("/metrics", apiCfg.getMetrics)
+	adminRouter.Get("/metrics", apiCfg.GetMetrics)
 
-	corsMux := middlewareCors(r)
+	corsMux := api.MiddlewareCors(r)
 	server := &http.Server{
 		Addr:    ":" + port,
 		Handler: corsMux,

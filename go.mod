@@ -1,4 +1,4 @@
-module github.com/like2foxes/chripy
+module github.com/like2foxes/chirpy
 
 go 1.21.3
 

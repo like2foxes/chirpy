@@ -58,6 +58,11 @@ func (db *DB) CreateUser(email string, password string) (User, error) {
 		log.Println("Error loading db")
 		return User{}, err
 	}
+	_, err = db.GetUserByEmail(email)
+	if err == nil {
+		log.Println("a user with that email already exists")
+		return User{}, errors.New("a user with that email already exists")
+	}
 	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		log.Println("Error hashing password")
@@ -76,6 +81,19 @@ func (db *DB) CreateUser(email string, password string) (User, error) {
 		return User{}, err
 	}
 	return user, nil
+}
+
+func (db *DB) GetUserByEmail(email string) (User, error) {
+	dbStruct, err := db.loadDB()
+	if err != nil {
+		return User{}, err
+	}
+	for _, user := range dbStruct.Users {
+		if user.Email == email {
+			return user, nil
+		}
+	}
+	return User{}, errors.New("not found")
 }
 
 func (db *DB) GetUser(id int) (User, error) {
