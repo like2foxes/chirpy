@@ -22,3 +22,9 @@ go.work
 
 # file database
 database.json
+
+# Environment variables file
+.env
+
+# Binary files
+bin/

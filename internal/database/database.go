@@ -83,6 +83,33 @@ func (db *DB) CreateUser(email string, password string) (User, error) {
 	return user, nil
 }
 
+func (db *DB) UpdateUser(user User) (User, error) {
+	dbStruct, err := db.loadDB()
+	if err != nil {
+		return User{}, err
+	}
+
+	for i, dbUser := range dbStruct.Users {
+		if dbUser.Id == user.Id {
+			hashed, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+			if err != nil {
+				return User{}, err
+			}
+			user.Password = string(hashed)
+			dbStruct.Users[i] = user
+			err = db.writeDb(dbStruct)
+			if err != nil {
+				return User{}, err
+			}
+			return dbStruct.Users[i], nil
+		}
+	}
+	if err != nil {
+		return User{}, err
+	}
+	return User{}, errors.New("user does not exist")
+}
+
 func (db *DB) GetUserByEmail(email string) (User, error) {
 	dbStruct, err := db.loadDB()
 	if err != nil {
@@ -94,6 +121,20 @@ func (db *DB) GetUserByEmail(email string) (User, error) {
 		}
 	}
 	return User{}, errors.New("not found")
+}
+
+func (db *DB) PrintUsers() {
+	dbStruct, err := db.loadDB()
+	if err != nil {
+		log.Println("Error loading db")
+		return
+	}
+	for _, user := range dbStruct.Users {
+		log.Println(user.Id)
+		log.Println(user.Email)
+		log.Println(user.Password)
+		log.Println("----")
+	}
 }
 
 func (db *DB) GetUser(id int) (User, error) {

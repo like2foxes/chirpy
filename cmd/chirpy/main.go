@@ -2,17 +2,22 @@ package main
 
 import (
 	"flag"
+	"github.com/go-chi/chi/v5"
+	"github.com/joho/godotenv"
+	"github.com/like2foxes/chirpy/internal/api"
 	"log"
 	"net/http"
 	"os"
-
-	"github.com/go-chi/chi/v5"
-	"github.com/like2foxes/chripy/internal/api"
 )
 
 func main() {
-	const fileRoot = "."
+	const fileRoot = "./public"
 	const port = "8080"
+
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("Error loading .env file")
+	}
 
 	dbg := flag.Bool("debug", false, "enable debug mode")
 	flag.Parse()
@@ -47,6 +52,8 @@ func main() {
 	apiRouter.Get("/users", api.GetUsers)
 	apiRouter.Get("/users/{id}", api.GetUser)
 	apiRouter.Post("/users", api.PostUser)
+	apiRouter.Post("/login", apiCfg.PostLogin)
+	apiRouter.Put("/users", apiCfg.PutUser)
 
 	r.Mount("/admin", adminRouter)
 	adminRouter.Get("/metrics", apiCfg.GetMetrics)
