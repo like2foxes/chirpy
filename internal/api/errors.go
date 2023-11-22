@@ -28,3 +28,18 @@ func internalServerError(w http.ResponseWriter, err error) {
 	log.Printf("Error: %s\n", err.Error())
 	respondWithError(w, http.StatusInternalServerError, "internal server error")
 }
+
+func decodingError(w http.ResponseWriter, err error) {
+	log.Printf("Error decoding request body: %s\n", err.Error())
+	respondWithError(w, http.StatusBadRequest, "invalid request body")
+}
+
+func conversionError(w http.ResponseWriter, err error) {
+	log.Printf("Error converting response: %s\n", err.Error())
+	respondWithError(w, http.StatusInternalServerError, "internal server error")
+}
+
+func chirpLengthError(w http.ResponseWriter, err error) {
+	log.Printf("Error: %s\n", err.Error())
+	respondWithError(w, http.StatusBadRequest, "Chirp is too long")
+}

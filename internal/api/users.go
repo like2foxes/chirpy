@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
@@ -9,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/like2foxes/chirpy/internal/database"
 	"golang.org/x/crypto/bcrypt"
@@ -27,52 +25,30 @@ type noPasswordUser struct {
 	Token string `json:"token,omitempty"`
 }
 
-func (c ApiConfig) PutUser(w http.ResponseWriter, r *http.Request) {
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		autherizationHeaderError(w, errors.New("no authorization header"))
-		return
-	}
-	authHeaderParts := strings.Split(authHeader, " ")
-	if len(authHeaderParts) != 2 {
-		autherizationHeaderError(w, errors.New("invalid authorization header"))
-		return
-	}
-	tokenString := authHeaderParts[1]
-	token, err := jwt.ParseWithClaims(
-		tokenString,
-		&jwt.RegisteredClaims{},
-		func(token *jwt.Token) (interface{}, error) {
-			return []byte(c.jwtSecret), nil
-		},
-	)
-	if err != nil {
-		tokenParsingError(w, err)
-		return
-	}
-
-	claims, ok := token.Claims.(*jwt.RegisteredClaims)
-	if !ok {
-		tokenParsingError(w, errors.New("invalid token claims"))
-		return
-	}
-
+func validateExpirationTime(w http.ResponseWriter, r *http.Request, claims jwt.RegisteredClaims) bool {
 	expiresAt, err := claims.GetExpirationTime()
 	if err != nil {
 		tokenParsingError(w, err)
-		return
+		return false
 	}
 	if jwt.NewNumericDate(time.Now().UTC()).After(expiresAt.Time) {
 		tokenParsingError(w, errors.New("token expired"))
+		return false
+	}
+	return true
+}
+func (c ApiConfig) PutUser(w http.ResponseWriter, r *http.Request) {
+	claims, ok := parseClaimsFromHeader(w, r, c.jwtSecret)
+	if !ok {
 		return
 	}
 
-	decoder := json.NewDecoder(r.Body)
+	if !validateExpirationTime(w, r, claims) {
+		return
+	}
+
 	var u user
-	err = decoder.Decode(&u)
-	if err != nil {
-		log.Println("Error decoding user")
-		respondWithError(w, http.StatusBadRequest, err.Error())
+	if decodeItemOr404(w, r, &u) {
 		return
 	}
 
@@ -102,14 +78,11 @@ func (c ApiConfig) PutUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c ApiConfig) PostUser(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
 	var u user
-	err := decoder.Decode(&u)
-	if err != nil {
-		log.Println("Error decoding user")
-		respondWithError(w, http.StatusBadRequest, err.Error())
+	if decodeItemOr404(w, r, &u) {
 		return
 	}
+
 	user, err := c.db.CreateUser(u.Email, u.Password)
 	if err != nil {
 		queryError(w, err)
@@ -130,14 +103,11 @@ func (c ApiConfig) GetUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c ApiConfig) GetUser(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	idAsInt, err := strconv.Atoi(id)
-	if err != nil {
-		log.Println("Error converting id to int")
-		respondWithError(w, http.StatusBadRequest, err.Error())
+	id, ok := idFromURL(w, r)
+	if !ok {
 		return
 	}
-	user, err := c.db.GetUser(idAsInt)
+	user, err := c.db.GetUser(id)
 	if err != nil {
 		queryError(w, err)
 		return
@@ -146,14 +116,11 @@ func (c ApiConfig) GetUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *ApiConfig) PostLogin(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
 	var u user
-	err := decoder.Decode(&u)
-	if err != nil {
-		log.Println("Error decoding user")
-		respondWithError(w, http.StatusBadRequest, err.Error())
+	if decodeItemOr404(w, r, &u) {
 		return
 	}
+
 	user, err := c.db.GetUserByEmail(u.Email)
 	if err != nil {
 		queryError(w, err)
@@ -222,3 +189,56 @@ func (c ApiConfig) createJWTTokenForUser(user user, id int) (string, error) {
 	}
 	return tokenString, nil
 }
+
+func parseClaimsFromHeader(w http.ResponseWriter, r *http.Request, secret string) (jwt.RegisteredClaims, bool) {
+	tokenString, ok := getTokenStringFromHeader(w, r)
+	if !ok {
+		return jwt.RegisteredClaims{}, false
+	}
+	claimes, ok := parseTokenString(w, tokenString, secret)
+	if !ok {
+		return jwt.RegisteredClaims{}, false
+	}
+	return *claimes, true
+}
+
+func parseTokenString(
+	w http.ResponseWriter,
+	tokenString string,
+	secret string,
+) (*jwt.RegisteredClaims, bool) {
+	token, err := jwt.ParseWithClaims(
+		tokenString,
+		&jwt.RegisteredClaims{},
+		func(token *jwt.Token) (interface{}, error) {
+			return []byte(secret), nil
+		},
+	)
+	if err != nil {
+		tokenParsingError(w, err)
+		return nil, false
+	}
+
+	claims, ok := token.Claims.(*jwt.RegisteredClaims)
+	if !ok {
+		tokenParsingError(w, errors.New("invalid token claims"))
+		return nil, false
+	}
+	return claims, true
+}
+
+func getTokenStringFromHeader(w http.ResponseWriter, r *http.Request) (string, bool) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		autherizationHeaderError(w, errors.New("no authorization header"))
+		return "", false
+	}
+	authHeaderParts := strings.Split(authHeader, " ")
+	if len(authHeaderParts) != 2 {
+		autherizationHeaderError(w, errors.New("invalid authorization header"))
+		return "", false
+	}
+	tokenString := authHeaderParts[1]
+	return tokenString, true
+}
+
