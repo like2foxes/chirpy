@@ -8,12 +8,6 @@ import (
 	"strings"
 )
 
-func GetHealthz(w http.ResponseWriter, r *http.Request) {
-	w.Header().Add("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(http.StatusText(http.StatusOK)))
-}
-
 func respondWithError(w http.ResponseWriter, status int, msg string) {
 	log.Println(msg)
 	ce := chirpError{Error: msg}

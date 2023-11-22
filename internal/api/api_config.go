@@ -3,17 +3,17 @@ package api
 import (
 	"fmt"
 	"net/http"
-	"os"
+	"github.com/like2foxes/chirpy/internal/database"
 )
 
 type ApiConfig struct {
 	fileserverHits int
 	jwtSecret      string
+	db             *database.DB
 }
 
-func NewApiConfig() *ApiConfig {
-	jwtSecret := os.Getenv("JWT_SECRET")
-	return &ApiConfig{fileserverHits: 0, jwtSecret: jwtSecret}
+func NewApiConfig(jwtSecret string, db *database.DB, fileserverHits int) *ApiConfig {
+	return &ApiConfig{fileserverHits, jwtSecret, db}
 }
 
 func (c *ApiConfig) MiddlewareMetricsInc(next http.Handler) http.Handler {

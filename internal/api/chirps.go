@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"github.com/go-chi/chi/v5"
-	"github.com/like2foxes/chirpy/internal/database"
 	"log"
 	"net/http"
 	"strconv"
@@ -21,14 +20,8 @@ type chirpValid struct {
 	Cleansed string `json:"cleaned_body"`
 }
 
-func GetChirps(w http.ResponseWriter, r *http.Request) {
-	db, err := database.NewDB("database.json")
-	if err != nil {
-		log.Println("Error creating db")
-		respondWithError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	chirps, err := db.GetChirps()
+func (c ApiConfig) GetChirps(w http.ResponseWriter, r *http.Request) {
+	chirps, err := c.db.GetChirps()
 	if err != nil {
 		log.Println("Error getting chirps")
 		respondWithError(w, http.StatusInternalServerError, err.Error())
@@ -37,37 +30,25 @@ func GetChirps(w http.ResponseWriter, r *http.Request) {
 	respondWithJSON(w, http.StatusOK, chirps)
 }
 
-func GetChirp(w http.ResponseWriter, r *http.Request) {
+func (c ApiConfig) GetChirp(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	db, err := database.NewDB("database.json")
-	if err != nil {
-		log.Println("Error creating db")
-		respondWithError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
 	idAsInt, err := strconv.Atoi(id)
 	if err != nil {
 		log.Println("Error converting id to int")
 		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	chirp, err := db.GetChirp(idAsInt)
+	chirp, err := c.db.GetChirp(idAsInt)
 	if err != nil {
-		log.Println("Error getting chirp")
-		if err.Error() == "not found" {
-			respondWithError(w, http.StatusNotFound, err.Error())
-			return
-		}
-		respondWithError(w, http.StatusInternalServerError, err.Error())
+		queryError(w, err)
 		return
 	}
 	respondWithJSON(w, http.StatusOK, chirp)
 }
 
-func PostChirp(w http.ResponseWriter, r *http.Request) {
-
+func (c ApiConfig) PostChirp(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
-	var c chirp
+	var ch chirp
 	err := decoder.Decode(&c)
 
 	if err != nil {
@@ -76,21 +57,15 @@ func PostChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(c.Body) > 140 {
+	if len(ch.Body) > 140 {
 		log.Println("Chirp is too long")
 		respondWithError(w, http.StatusBadRequest, "Chirp is too long")
 		return
 	}
 
-	cleaned := cleanData(c.Body)
-	db, err := database.NewDB("database.json")
-	if err != nil {
-		log.Println("Error creating db")
-		respondWithError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
+	cleaned := cleanData(ch.Body)
 
-	chirp, err := db.CreateChirp(cleaned)
+	chirp, err := c.db.CreateChirp(cleaned)
 	if err != nil {
 		log.Println("Error creating chirp")
 		respondWithError(w, http.StatusInternalServerError, err.Error())
