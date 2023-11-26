@@ -2,12 +2,10 @@ package database
 
 import (
 	"encoding/json"
-	"errors"
 	"log"
 	"os"
 	"sync"
-
-	"golang.org/x/crypto/bcrypt"
+	"time"
 )
 
 type DB struct {
@@ -16,27 +14,9 @@ type DB struct {
 }
 
 type DBStructure struct {
-	Chirps []Chirp `json:"chirps"`
-	Users  []User  `json:"users"`
-}
-
-type Chirp struct {
-	Id   int    `json:"id"`
-	Body string `json:"body"`
-}
-
-type User struct {
-	Id       int    `json:"id"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-func (c Chirp) GetId() int {
-	return c.Id
-}
-
-func (u User) GetId() int {
-	return u.Id
+	Chirps  []Chirp              `json:"chirps"`
+	Users   []User               `json:"users"`
+	Revokes map[string]time.Time `json:"revokes"`
 }
 
 func NewDB(path string) (*DB, error) {
@@ -52,153 +32,6 @@ func NewDB(path string) (*DB, error) {
 	return db, nil
 }
 
-func (db *DB) CreateUser(email string, password string) (User, error) {
-	dbStruct, err := db.loadDB()
-	if err != nil {
-		log.Println("Error loading db")
-		return User{}, err
-	}
-	_, err = db.GetUserByEmail(email)
-	if err == nil {
-		log.Println("a user with that email already exists")
-		return User{}, errors.New("a user with that email already exists")
-	}
-	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		log.Println("Error hashing password")
-		return User{}, err
-	}
-	id := calculateId(dbStruct.Users)
-	user := User{
-		Id:       id,
-		Email:    email,
-		Password: string(hashed),
-	}
-	dbStruct.Users = append(dbStruct.Users, user)
-	err = db.writeDb(dbStruct)
-	if err != nil {
-		log.Println("Error writing db")
-		return User{}, err
-	}
-	return user, nil
-}
-
-func (db *DB) UpdateUser(user User) (User, error) {
-	dbStruct, err := db.loadDB()
-	if err != nil {
-		return User{}, err
-	}
-
-	for i, dbUser := range dbStruct.Users {
-		if dbUser.Id == user.Id {
-			hashed, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
-			if err != nil {
-				return User{}, err
-			}
-			user.Password = string(hashed)
-			dbStruct.Users[i] = user
-			err = db.writeDb(dbStruct)
-			if err != nil {
-				return User{}, err
-			}
-			return dbStruct.Users[i], nil
-		}
-	}
-	if err != nil {
-		return User{}, err
-	}
-	return User{}, errors.New("user does not exist")
-}
-
-func (db *DB) GetUserByEmail(email string) (User, error) {
-	dbStruct, err := db.loadDB()
-	if err != nil {
-		return User{}, err
-	}
-	for _, user := range dbStruct.Users {
-		if user.Email == email {
-			return user, nil
-		}
-	}
-	return User{}, errors.New("not found")
-}
-
-func (db *DB) PrintUsers() {
-	dbStruct, err := db.loadDB()
-	if err != nil {
-		log.Println("Error loading db")
-		return
-	}
-	for _, user := range dbStruct.Users {
-		log.Println(user.Id)
-		log.Println(user.Email)
-		log.Println(user.Password)
-		log.Println("----")
-	}
-}
-
-func (db *DB) GetUser(id int) (User, error) {
-	dbStruct, err := db.loadDB()
-	if err != nil {
-		return User{}, err
-	}
-	for _, user := range dbStruct.Users {
-		if user.Id == id {
-			return user, nil
-		}
-	}
-	return User{}, errors.New("not found")
-}
-
-func (db *DB) GetUsers() ([]User, error) {
-	dbStruct, err := db.loadDB()
-	if err != nil {
-		return nil, err
-	}
-	return dbStruct.Users, nil
-}
-
-func (db *DB) CreateChirp(body string) (Chirp, error) {
-	dbStruct, err := db.loadDB()
-	if err != nil {
-		return Chirp{}, err
-	}
-
-	id := calculateId(dbStruct.Chirps)
-	chirp := Chirp{
-		Id:   id,
-		Body: body,
-	}
-	dbStruct.Chirps = append(dbStruct.Chirps, chirp)
-	err = db.writeDb(dbStruct)
-	if err != nil {
-		return Chirp{}, err
-	}
-
-	return chirp, nil
-}
-
-func (db *DB) GetChirps() ([]Chirp, error) {
-	data, err := db.loadDB()
-	if err != nil {
-		return nil, err
-	}
-	return data.Chirps, nil
-}
-
-func (db *DB) GetChirp(id int) (Chirp, error) {
-	data, err := db.loadDB()
-	if err != nil {
-		return Chirp{}, err
-	}
-	for _, chirp := range data.Chirps {
-		if chirp.Id == id {
-			return chirp, nil
-		}
-	}
-	return Chirp{}, errors.New("not found")
-}
-
 func (db *DB) ensureDb() error {
 	var file *os.File
 	if _, err := os.Stat(db.path); os.IsNotExist(err) {
@@ -208,6 +41,8 @@ func (db *DB) ensureDb() error {
 		}
 		dbStruct := DBStructure{
 			Chirps: []Chirp{},
+			Users:  []User{},
+			Revokes: map[string]time.Time{},
 		}
 		content, err := json.Marshal(dbStruct)
 		if err != nil {

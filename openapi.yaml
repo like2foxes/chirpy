@@ -1,0 +1,11 @@
+openapi: 3.1.0
+info:
+  title: Chirpy
+  description: |
+    This API allows CRUD operations on Chirps and Chirpy users.
+  version: 1.0.0
+paths:
+  /api/chrips:
+    get:
+      summary: Get all chirps
+      description:: Retrieves all of the chirps

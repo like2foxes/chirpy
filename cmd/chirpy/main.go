@@ -58,6 +58,8 @@ func main() {
 	apiRouter.Post("/users", apiCfg.PostUser)
 	apiRouter.Post("/login", apiCfg.PostLogin)
 	apiRouter.Put("/users", apiCfg.PutUser)
+	apiRouter.Post("/refresh", apiCfg.PostRefresh)
+	apiRouter.Post("/revoke", apiCfg.PostRevoke)
 
 	r.Mount("/admin", adminRouter)
 	adminRouter.Get("/metrics", apiCfg.GetMetrics)
